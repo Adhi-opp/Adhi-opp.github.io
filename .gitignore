@@ -1,0 +1,8 @@
+node_modules/
+.artifact/
+.DS_Store
+Thumbs.db
+
+# local-only tooling (screenshot capture logs into local apps; drafts)
+tools/*
+!tools/serve.js

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Only this site's own scripts may run; fonts from Google only; no forms, plugins or base-URL tricks. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Adhiraj Singh</title>
+<meta name="description" content="Adhiraj Singh, backend and data engineer building market-data systems: GammaLeak, TradeRetro, Alpha and Phasr.">
+<link rel="canonical" href="https://adhi-opp.github.io/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://adhi-opp.github.io/">
+<meta property="og:title" content="Adhiraj Singh: market-data systems">
+<meta property="og:description" content="Backend and data engineering for Indian markets. Four projects, from the feed handler to the screen: GammaLeak, TradeRetro, Alpha and Phasr.">
+<meta property="og:image" content="https://adhi-opp.github.io/assets/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#060607">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Geist:wght@300..800&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<header class="head" id="head">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Adhiraj Singh, back to top"><span class="full">Adhiraj Singh</span><span class="short">AS</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#work" data-sec="work">Work</a>
+      <a href="#stack" data-sec="stack">Stack</a>
+      <a href="#journey" data-sec="journey">Journey</a>
+      <a href="#contact" data-sec="contact">Contact</a>
+    </nav>
+    <div class="mkt" id="mkt" title="NSE equity session, 09:15 to 15:30 IST, Monday to Friday"><span class="dot"></span><span class="txt" id="mkt-txt">NSE</span></div>
+    <a class="btn" href="https://github.com/Adhi-opp" target="_blank" rel="noopener">GitHub <span class="arr">↗</span></a>
+  </div>
+</header>
+
+<!-- ================================================================ HOME -->
+<main class="view" data-view="home" id="top">
+
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-top">
+        <div class="label">Backend &amp; data engineer — market systems</div>
+        <div class="hero-canvas" aria-hidden="true"><canvas data-scene="tape"></canvas></div>
+      </div>
+      <h1 class="hero-name" aria-label="Adhiraj Singh"><span class="ln"><span>Adhiraj</span></span><span class="ln"><span>Singh</span></span></h1>
+      <div class="hero-sub">
+        <p class="statement">I start from a hunch about how the market behaves lets say a gap, a shift, a pattern in the flow and make it earn its place: <em>audit the thesis against data before I build</em>, <em>throw out 99% of what AI hands me</em>, and <em>ship only what survives.</em></p>
+        <div class="hero-side">
+          <div class="label">B.Sc. Computer Science (AI &amp; ML)<br>BITS Pilani · 2027</div>
+          <a class="scroll label" href="#work"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" aria-hidden="true"><path d="M6 6l12 12M18 9v9H9"/></svg>Scroll to discover</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker" aria-label="Tools and topics">
+    <div class="ticker-track" id="ticker"></div>
+  </div>
+
+  <section class="section" id="work">
+    <div class="wrap">
+      <div class="sec-intro">
+        <div>
+          <div class="label sec-k"><b>01</b> — Work</div>
+          <h2 class="sec-title rv">Selected<br><span class="o">systems</span></h2>
+        </div>
+        <p class="rv">Four projects, each one layer of a market-data stack, built solo from the feed handler to the screen. Every screenshot below is the real app, captured running locally.</p>
+      </div>
+    </div>
+    <div id="chapters"></div>
+  </section>
+
+  <section class="section" id="stack" style="background:var(--bg-2)">
+    <div class="wrap">
+      <div class="sec-intro">
+        <div>
+          <div class="label sec-k"><b>02</b> — Stack</div>
+          <h2 class="sec-title rv">Tools I<br>reach for</h2>
+        </div>
+        <p class="rv">Grouped by the layer they serve. The coloured tags show which project each one is used in.</p>
+      </div>
+      <div class="stack-grid" id="stack-grid"></div>
+    </div>
+    <div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+  </section>
+
+  <section class="section" id="journey">
+    <div class="wrap">
+      <div class="sec-intro">
+        <div>
+          <div class="label sec-k"><b>03</b> — Journey</div>
+          <h2 class="sec-title rv">Journey<span style="color:var(--ink-2)">.</span></h2>
+        </div>
+        <p class="rv">No job titles yet, so this is the honest version: what I studied and the moments that changed how I build. Each one links to the commit where it happened.</p>
+      </div>
+      <div class="journey" id="journey-list"></div>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap">
+      <div class="label"><b>04</b> — Contact · open to data, backend &amp; market-data roles</div>
+      <div class="talk rv">
+        <figure class="me">
+          <img src="assets/img/me.webp" alt="Adhiraj Singh, sunlit selfie" width="480" height="480" loading="lazy">
+          <figcaption>Most professional <span>guy ever</span></figcaption>
+        </figure>
+        <h2>Let's talk.</h2>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" data-copy-email>Copy email</button>
+        <a class="btn ghost" href="https://github.com/Adhi-opp" target="_blank" rel="noopener">GitHub <span class="arr">↗</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ================================================================ CASE STUDY -->
+<main class="view cs" data-view="case" id="case" hidden></main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <div class="nm">Adhiraj Singh</div>
+      <div class="label" style="margin-top:10px">Building data systems for markets.</div>
+    </div>
+    <div>
+      <span class="label">Work</span>
+      <a href="#gammaleak">GammaLeak</a><a href="#traderetro">TradeRetro</a><a href="#alpha">Alpha</a><a href="#phasr">Phasr</a>
+    </div>
+    <div>
+      <span class="label">Contact</span>
+      <a href="https://github.com/Adhi-opp" target="_blank" rel="noopener">GitHub ↗</a>
+      <a href="#contact" data-mailto>Email</a>
+      <span class="label" style="margin-top:10px">Delhi, India</span>
+    </div>
+    <a class="label" href="#top" style="text-decoration:none">↑ Back to top</a>
+  </div>
+</footer>
+
+<script src="assets/js/projects.js"></script>
+<script src="assets/js/scenes.js"></script>
+<script src="assets/js/main.js"></script>
+</body>
+</html>
