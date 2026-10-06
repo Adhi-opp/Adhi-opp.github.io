@@ -66,14 +66,101 @@
     else rect(ctx, x - cw / 2, y1, cw, hgt, null, color);
   }
 
-  /* ================================================================ HERO: TAPE */
+  /* ================================================================ HERO: REPLAY TAPE */
+  // Replays real GammaLeak sessions (see replay.js) at 150x: one session minute
+  // every 0.4 s, with the engine's own events marked where they fired.
+  const HERO_SPEED = 2.5, HERO_START = 48;
+  const EVC = { alert: "#2fd6f0", confirm: C.up, abort: C.down, exit: "rgba(242,242,238,.62)" };
   const tape = {
+    cycle: 0,
+    init() {
+      const R = window.GLReplay, s = { mode: "loading", d: null, cur: 0, f: 0, last: null, lastT: -9 };
+      const fallback = () => { s.mode = "synthetic"; s.syn = synth.init(); };
+      if (!R) { fallback(); return s; }
+      const first = R.peek(R.SESSIONS[0]);
+      if (first) tape.start(s, first);
+      else R.load(R.SESSIONS[0]).then((d) => { tape.start(s, d); if (REDUCED && window.Scenes) window.Scenes.refresh(); }).catch(fallback);
+      return s;
+    },
+    start(s, d) { s.d = d; s.mode = "replay"; s.cur = Math.min(HERO_START, d.bars.length - 1); s.f = 0; s.last = null; },
+    next(s) {
+      const R = window.GLReplay, list = R.SESSIONS, nf = list[(list.indexOf(s.d.file) + 1) % list.length], nd = R.peek(nf);
+      if (nd) tape.start(s, nd); else { R.load(nf).catch(() => {}); tape.start(s, s.d); }
+    },
+    draw(ctx, w, h, t, dt, s) {
+      if (s.mode === "synthetic") return synth.draw(ctx, w, h, t, dt, s.syn);
+      brackets(ctx, w, h, C.line, 12);
+      txt(ctx, "REPLAY.SYS", 14, 20, { size: 10, color: C.ink, weight: 600, ls: 2 });
+      if (s.mode === "loading") { txt(ctx, "— loading session", 98, 20, { size: 10, color: C.dim, ls: 1.5 }); return; }
+      const d = s.d, bars = d.bars, F = window.GLReplay.fmt;
+      s.f += dt * HERO_SPEED;
+      while (s.f >= 1) {
+        s.f -= 1; s.cur++;
+        if (s.cur >= bars.length) { tape.next(s); return; }
+        const m0 = bars[s.cur - 1].m, m1 = bars[s.cur].m;
+        d.events.forEach((e) => { if (e.m > m0 && e.m <= m1 && e.type !== "STATE_CHANGE") { s.last = e; s.lastT = t; } });
+        if (s.cur === bars.length - 60) window.GLReplay.load(window.GLReplay.SESSIONS[(window.GLReplay.SESSIONS.indexOf(d.file) + 1) % window.GLReplay.SESSIONS.length]).catch(() => {});
+      }
+      const x0 = 14, x1 = w - 76, y0 = 34, y1 = h - 40;
+      const slots = Math.max(16, Math.min(32, Math.floor((x1 - x0) / 13)));
+      const first = Math.max(0, s.cur - slots + 1), vis = bars.slice(first, s.cur + 1);
+      // the newest bar forms in front of you: close walks from open to its real close
+      const b0 = bars[s.cur], k = ease(s.f), fc = lerp(b0.o, b0.c, k);
+      const form = { o: b0.o, c: fc, h: Math.max(b0.o, fc, lerp(b0.o, b0.h, Math.min(1, s.f * 1.6))), l: Math.min(b0.o, fc, lerp(b0.o, b0.l, Math.min(1, s.f * 1.6))), vwap: b0.vwap, m: b0.m };
+      vis[vis.length - 1] = form;
+      let lo = Infinity, hi = -Infinity;
+      vis.forEach((b) => { lo = Math.min(lo, b.l, b.vwap); hi = Math.max(hi, b.h, b.vwap); });
+      const pad = Math.max(2, (hi - lo) * 0.14); lo -= pad; hi += pad;
+      const Y = (p) => y0 + (1 - (p - lo) / (hi - lo)) * (y1 - y0);
+      const sw = (x1 - x0) / slots, cw = Math.max(3, sw * 0.52);
+      for (let i = 0; i <= 3; i++) {
+        const p = lo + ((hi - lo) * i) / 3, y = Math.round(Y(p)) + .5;
+        line(ctx, x0, y, x1, y, C.faint, 1, [2, 4]);
+        if (Math.abs(y - Y(form.c)) > 14) txt(ctx, p.toFixed(2), x1 + 10, y + 3, { size: 9.5, color: C.dim, ls: .5 });
+      }
+      vis.forEach((b, i) => {
+        const x = x0 + sw * (i + 0.5);
+        if (i === vis.length - 1) {
+          line(ctx, x, Y(b.h), x, Y(b.l), C.ink, 1, [2, 2]);
+          const ya = Y(Math.max(b.o, b.c)), yb = Y(Math.min(b.o, b.c));
+          rect(ctx, x - cw / 2, ya, cw, Math.max(2, yb - ya), C.ink, null, 1, [2, 2]);
+        } else candle(ctx, x, cw, Y, b, b.c >= b.o ? C.ink : C.dim, true);
+      });
+      ctx.beginPath(); vis.forEach((b, i) => { const x = x0 + sw * (i + 0.5); i ? ctx.lineTo(x, Y(b.vwap)) : ctx.moveTo(x, Y(b.vwap)); });
+      ctx.strokeStyle = "rgba(242,242,238,.35)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+      // the engine's events, above the bar when price was stretched up, below when down
+      d.events.forEach((e) => {
+        if (e.type === "STATE_CHANGE" || e.m < vis[0].m || e.m > form.m) return;
+        let i = vis.findIndex((b) => b.m >= e.m); if (i < 0) i = vis.length - 1;
+        const b = vis[i], x = x0 + sw * (i + 0.5), y = e.side > 0 ? Y(b.h) - 10 : Y(b.l) + 10;
+        window.GLReplay.glyph(ctx, e.type, x, y, EVC, "#060607");
+        if (e === s.last && t - s.lastT < 3.5) {
+          const a = 1 - Math.max(0, t - s.lastT - 2.5);
+          ctx.globalAlpha = a;
+          txt(ctx, e.type, x + 9, y + 3.5, { size: 9, color: e.type === "ALERT" ? EVC.alert : e.type === "CONFIRM" ? EVC.confirm : e.type === "ABORT" ? EVC.abort : C.ink2, weight: 600, ls: 1.2 });
+          ctx.globalAlpha = 1;
+        }
+      });
+      const lx = x0 + sw * (vis.length - 0.5), up = form.c >= bars[0].o, col = up ? C.up : C.down, ly = Y(form.c);
+      line(ctx, lx, ly + .5, x1, ly + .5, col, 1, [1, 3]);
+      rect(ctx, x1 + 4, ly - 9, 68, 18, null, col);
+      txt(ctx, form.c.toFixed(2), x1 + 38, ly + 3.5, { size: 10, color: "#060607", align: "center", weight: 600, ls: .3 });
+      const narrow = w < 430;
+      txt(ctx, `— ${d.name} · ${d.day.toUpperCase()}${narrow ? "" : " · 150× REPLAY"}`, 98, 20, { size: 10, color: C.dim, ls: 1.5 });
+      txt(ctx, "VWAP ┄", w - 14, 20, { size: 9.5, color: C.dim, align: "right", ls: 1.5 });
+      txt(ctx, `${F.hhmm(b0.m)} IST · Z ${F.z(b0.z)} · CVD ${F.k(b0.cvd)}`, 14, h - 14, { size: 9.5, color: C.ink2, ls: 1.2 });
+      if (!narrow || w > 360) txt(ctx, (b0.vd || "").replace(" — ", " · "), w - 14, h - 14, { size: 9.5, color: C.dim, align: "right", ls: 1.2 });
+    },
+  };
+
+  /* ---------------------------------------------- hero fallback: synthetic tape */
+  const synth = {
     cycle: 0,
     init() {
       const r = rng(11), s = { r, p: 22488.4, drift: 0, bars: [], cur: null, ticks: [], bt: 0, acc: 0, n: 0, count: 0, open: 0 };
       s.cur = { o: s.p, h: s.p, l: s.p, c: s.p, v: 0, pv: 0 };
       s.open = s.p;
-      for (let i = 0; i < 30 * 32; i++) tape.tick(s, i * 0.07, true);
+      for (let i = 0; i < 30 * 32; i++) synth.tick(s, i * 0.07, true);
       return s;
     },
     tick(s, now, warm) {
@@ -88,7 +175,7 @@
     },
     draw(ctx, w, h, t, dt, s) {
       s.acc += dt;
-      while (s.acc >= 0.07) { tape.tick(s, t, false); s.acc -= 0.07; }
+      while (s.acc >= 0.07) { synth.tick(s, t, false); s.acc -= 0.07; }
       s.ticks = s.ticks.filter((k) => t - k.t < 1.6);
       brackets(ctx, w, h, C.line, 12);
       const x0 = 14, x1 = w - 76, y0 = 34, y1 = h - 40;
@@ -133,6 +220,7 @@
   /* ================================================================ GAMMALEAK */
   const gammaleak = {
     cycle: 12,
+    cam: { vw: 900, focus: [[0.01, 0.42], [0.37, 0.69], [0.58, 1]] },
     init() { return { tokens: [], q: [], spawn: 0, proc: 0, cvd: 0, hist: [0], z: .3, rows: 0, dropFlash: 0, rowsFlash: 0, r: rng(3), lastCt: 0 }; },
     draw(ctx, w, h, t, dt, s, sc) {
       const T = 12, ct = t % T, acc = sc.acc;
@@ -253,6 +341,7 @@
   /* ================================================================ TRADERETRO */
   const traderetro = {
     cycle: 15,
+    cam: { vw: 760, fadeLeft: false, focus: [[0, 0.45], [0.3, 0.75], [0.5, 1]] }, // the scene steers the camera itself (see sc.focus)
     init() {
       const r = rng(21); let p = 2948.6; const bars = [];
       for (let i = 0; i < 12; i++) { const o = p; let c = o, hh = o, ll = o; for (let k = 0; k < 10; k++) { c += (r() - 0.48) * 1.8; hh = Math.max(hh, c); ll = Math.min(ll, c); } bars.push({ o, h: hh + r() * .6, l: ll - r() * .6, c }); p = c; }
@@ -268,7 +357,15 @@
       const rows = { stream: 30, b0: 56, b1: 104, s0: 122, s1: 188, g0: 204, g1: h - 18 };
       const X = (c) => L + cw * (c + 0.5);
       // row labels + separators
-      [["REDIS STREAM", rows.stream + 3], ["BRONZE · TICKS", (rows.b0 + rows.b1) / 2 + 3], ["SILVER · 1 MIN", (rows.s0 + rows.s1) / 2 + 3], ["GOLD · 5 MIN", (rows.g0 + rows.g1) / 2 + 3]].forEach(([s1, y]) => txt(ctx, s1, 18, y, { size: 9.5, color: C.dim }));
+      const rowLabels = [["REDIS STREAM", rows.stream + 3], ["BRONZE · TICKS", (rows.b0 + rows.b1) / 2 + 3], ["SILVER · 1 MIN", (rows.s0 + rows.s1) / 2 + 3], ["GOLD · 5 MIN", (rows.g0 + rows.g1) / 2 + 3]];
+      if (!sc.compact) rowLabels.forEach(([s1, y]) => txt(ctx, s1, 18, y, { size: 9.5, color: C.dim }));
+      // narrow screens: a frozen label column (GW wide) on the left; the camera follows
+      // "now", then swings to the gap, and the REST repair starts closer so it fits
+      const GW = 112, restX = sc.compact ? X(G) + cw * 2.6 : R;
+      if (sc.compact) {
+        const c = Math.min(cur, N - 1); sc.focus = ct >= 10.6 ? [X(G) - cw * 0.9 - GW, X(G) + cw * 2.75] : [X(c) - cw * 3.1 - GW, X(c) + cw * 1.2];
+        ctx.save(); ctx.beginPath(); ctx.rect(sc.camX + GW, 0, w, h); ctx.clip();
+      }
       [rows.b0 - 8, rows.s0 - 8, rows.g0 - 6].forEach((y) => line(ctx, 14, y + .5, R, y + .5, C.faint, 1));
       for (let c = 0; c < N; c++) txt(ctx, "09:" + String(15 + c).padStart(2, "0"), X(c), rows.b0 - 13, { size: 8.5, color: c === cur ? C.ink2 : "rgba(242,242,238,.25)", align: "center", ls: .4 });
       // stream lane
@@ -305,8 +402,8 @@
         }
         if (ct >= 11.1) {
           const ry = rows.s0 - 3, tx = X(G) + cw * .3;
-          partial(ctx, [[R, ry], [tx, ry], [tx, rows.s0 + 14]], reconP, C.Y, 1);
-          txt(ctx, "REST API", R, ry - 5, { size: 8.5, color: C.Y, align: "right" });
+          partial(ctx, [[restX, ry], [tx, ry], [tx, rows.s0 + 14]], reconP, C.Y, 1);
+          txt(ctx, "REST API", restX, ry - 5, { size: 8.5, color: C.Y, align: "right" });
           if (reconP > .6) {
             ctx.globalAlpha = ease((reconP - .6) / .4); candle(ctx, X(G), cw * .42, SY, s.bars[G], C.Y, false, true); ctx.globalAlpha = 1;
             txt(ctx, "R", X(G) + cw * .32, rows.s0 + 9, { size: 9, color: C.Y, weight: 600 });
@@ -319,6 +416,12 @@
       if (cur >= 5) { ctx.globalAlpha = cur === 5 ? ease(frac / .5) : 1; candle(ctx, (X(0) + X(4)) / 2, cw * 2.2, GY, gb(0, 4), C.ink, true); ctx.globalAlpha = 1; }
       if (ct >= 11.9) { ctx.globalAlpha = ease((ct - 11.9) / .5); candle(ctx, (X(5) + X(9)) / 2, cw * 2.2, GY, gb(5, 9), C.ink, true); ctx.globalAlpha = 1; }
       if (cur >= 5) { line(ctx, X(0) - cw * .4, rows.g1 + 4, X(4) + cw * .4, rows.g1 + 4, C.faint, 1); }
+      if (sc.compact) {
+        ctx.restore();
+        const gx = sc.camX;
+        line(ctx, gx + GW + .5, 14, gx + GW + .5, h - 14, C.faint, 1);
+        rowLabels.forEach(([s1, y]) => txt(ctx, s1, gx + 12, y, { size: 9.5, color: C.ink2 }));
+      }
     },
   };
 
@@ -326,6 +429,7 @@
   const HASH = "1bc2279fee8cf4d5c3594025ceb6ccc8da8b00799c8f7a150b5f84cbb79955a8";
   const alpha = {
     cycle: 15,
+    cam: { vw: (w) => (w < 520 ? w * 3 : 1080), focus: [[0, 1 / 3], [1 / 3, 2 / 3], [2 / 3, 1]] },
     init() { return { r: rng(5), scr: "", scrT: 0 }; },
     draw(ctx, w, h, t, dt, s, sc) {
       const T = 15, ct = t % T, acc = sc.acc, k = Math.floor(t / T) % 2;
@@ -360,7 +464,7 @@
       const lx = dx + dw - 16, ly = dy + 10, closed = lockP >= 1;
       rect(ctx, lx - 7, ly + 6, 14, 11, closed ? acc : C.dim, null, 1.2);
       ctx.beginPath(); ctx.arc(lx, ly + 6 - (closed ? 0 : 4), 4.5, Math.PI, 0); ctx.strokeStyle = closed ? acc : C.dim; ctx.lineWidth = 1.2; ctx.stroke();
-      if (closed) txt(ctx, "FROZEN 11 JUL", lx - 14, dy + 18, { size: 8.5, color: acc, align: "right" });
+      if (closed) { if (dw >= 310) txt(ctx, "FROZEN 11 JUL", lx - 14, dy + 18, { size: 8.5, color: acc, align: "right" }); else txt(ctx, "FROZEN 11 JUL", dx + dw, 22, { size: 8.5, color: acc, align: "right" }); }
       ctx.globalAlpha = 1;
 
       // ---------- B: point in time
@@ -450,6 +554,7 @@
   const RECEIPT = ["BILL OF MATERIALS · 2 BHK · DELHI", "1.5 mm²      11 × 90 m", "2.5 mm²       4 × 90 m", "4.0 mm²       3 × 90 m", "MCB 10A B ×5 · 16A C ×4", "RCCB 63A 4P 30 mA ×1", "SUPPLY        3-PHASE"];
   const phasr = {
     cycle: 15,
+    cam: { vw: 820, focus: [[0, 0.45], [0.37, 0.72], [0.64, 1]] },
     init() { return {}; },
     draw(ctx, w, h, t, dt, s, sc) {
       const T = 15, ct = t % T, acc = sc.acc, RC = [C.R, C.Y, C.B];
@@ -530,9 +635,13 @@
 
   /* ================================================================ runner */
   const DEFS = { tape, gammaleak, traderetro, alpha, phasr };
+  // Below this stage width a scene keeps its desktop layout on a wider virtual
+  // canvas and a camera shows one zone at a time, following the active step.
+  const COMPACT_W = 860;
   const scenes = [];
   function Scene(canvas) {
     this.c = canvas; this.def = DEFS[canvas.dataset.scene]; this.s = this.def.init(); this.t = 0; this.on = false; this.lastStep = -1;
+    this.compact = false; this.camX = null; this.camS = 1; this.focus = null;
     this.stepsEl = canvas.closest(".how") ? canvas.closest(".how").querySelectorAll(".steps li") : [];
   }
   Scene.prototype.resize = function () {
@@ -548,13 +657,35 @@
   };
   Scene.prototype.frame = function (dt) {
     if (!this.w) return;
-    this.t += dt; this.ctx.clearRect(0, 0, this.w, this.h);
-    this.def.draw(this.ctx, this.w, this.h, this.t, dt, this.s, this);
+    const ctx = this.ctx, cam = this.def.cam;
+    this.t += dt; ctx.clearRect(0, 0, this.w, this.h);
+    this.compact = !!cam && this.w < COMPACT_W;
+    if (!this.compact) { this.camX = 0; this.camS = 1; this.def.draw(ctx, this.w, this.h, this.t, dt, this.s, this); return; }
+    const vw = typeof cam.vw === "function" ? cam.vw(this.w) : cam.vw;
+    // look at what the scene asked for last frame, else at its active step's zone
+    const f = this.focus || cam.focus[Math.max(0, this.lastStep)].map((v) => v * vw);
+    const scale = Math.min(1, this.w / Math.max(1, f[1] - f[0])), span = this.w / scale;
+    const tx = clamp((f[0] + f[1]) / 2 - span / 2, 0, Math.max(0, vw - span));
+    if (this.camX == null || dt === 0) { this.camX = tx; this.camS = scale; }
+    else { const k = 1 - Math.exp(-dt * 3.2); this.camX += (tx - this.camX) * k; this.camS += (scale - this.camS) * k; }
+    this.focus = null;
+    ctx.save(); ctx.scale(this.camS, this.camS); ctx.translate(-this.camX, 0);
+    this.def.draw(ctx, vw, this.h / this.camS, this.t, dt, this.s, this);
+    ctx.restore();
+    const cutL = cam.fadeLeft !== false && this.camX > 0.5, cutR = this.camX + this.w / this.camS < vw - 0.5;
+    if (cutL || cutR) {
+      const fw = 18;
+      ctx.save(); ctx.globalCompositeOperation = "destination-out";
+      const edge = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(.5, "rgba(0,0,0,.35)"); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(Math.min(x0, x1), 0, fw, this.h); };
+      if (cutL) edge(0, fw);
+      if (cutR) edge(this.w, this.w - fw);
+      ctx.restore();
+    }
   };
   Scene.prototype.still = function () {
     // reduced motion: step the simulation to a representative moment, draw once
     const target = (this.def.cycle || 6) * 0.8;
-    while (this.t < target) { const dt = 1 / 30; this.t += dt; this.ctx.clearRect(0, 0, this.w, this.h); this.def.draw(this.ctx, this.w, this.h, this.t, dt, this.s, this); }
+    while (this.t < target) this.frame(1 / 30);
   };
 
   let raf = 0, last = 0;

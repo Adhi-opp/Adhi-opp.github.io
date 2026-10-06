@@ -13,6 +13,8 @@ assets/css/main.css        all styles (one dark theme, per-project accent colour
 assets/js/projects.js      ALL project content: pitch, screens, steps, case studies, journey
 assets/js/scenes.js        canvas line-art animations (hero tape + one per project)
 assets/js/main.js          rendering, hash routing (#gammaleak etc.), tabs, market clock
+assets/js/replay.js        GammaLeak replay: hero tape data + the interactive signal tape
+assets/data/gammaleak/     real sessions as 1-minute bars + engine events (no raw ticks)
 assets/img/<project>/      real screenshots of each app, captured locally
 tools/serve.js             local preview server with live reload
 ```

@@ -12,13 +12,17 @@
   /* ------------------------------------------------------------ fragments */
   // Screens with made-up numbers carry a flag in the browser bar; wide
   // captures (with a bg colour) are fitted whole instead of cropped.
-  const flagHTML = (s) => (s.flag ? `<span class="frame-flag" title="${esc(s.tip || s.flag)}">${esc(s.flag)}</span>` : "");
+  const flagHTML = (s) => (s.flag ? `<span class="frame-flag${s.tone ? " " + s.tone : ""}" title="${esc(s.tip || s.flag)}">${esc(s.flag)}</span>` : "");
   const imgFit = (s) => (s.bg ? ` style="background:${s.bg}"` : "");
+  // a screen is either a screenshot or the live signal tape (replay.js)
+  const viewHTML = (p, s, on, lazy) => s.kind === "tape"
+    ? `<div class="fv tape${on ? " on" : ""}" data-tape></div>`
+    : `<img src="${s.src}" alt="${esc(p.name + ": " + s.title)}" ${lazy ? 'loading="lazy"' : ""} decoding="async" class="${["fv", on ? "on" : "", s.bg ? "fit" : ""].join(" ").trim()}"${imgFit(s)} width="1440" height="900">`;
   function frameHTML(p, withTabs) {
     const s0 = p.screens[0];
     return `<div class="frame" data-screens="${p.id}">
       <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><div class="frame-url" data-url><b>${esc(s0.url)}</b></div><span data-flag>${flagHTML(s0)}</span></div>
-      <div class="frame-view">${p.screens.map((s, i) => `<img src="${s.src}" alt="${esc(p.name + ": " + s.title)}" ${i ? 'loading="lazy"' : ""} decoding="async" class="${[i ? "" : "on", s.bg ? "fit" : ""].join(" ").trim()}"${imgFit(s)} width="1440" height="900">`).join("")}</div>
+      <div class="frame-view${s0.kind === "tape" ? " tall" : ""}">${p.screens.map((s, i) => viewHTML(p, s, !i, !!i)).join("")}</div>
       ${withTabs ? `<div class="tabs" role="tablist" aria-label="${esc(p.name)} screens">${p.screens.map((s, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-i="${i}"><span class="n">${pad(i + 1)}</span>${esc(s.tab)}</button>`).join("")}</div>` : ""}
     </div>`;
   }
@@ -45,6 +49,7 @@
             <ul class="ch-points">${p.points.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
             <div class="chips">${p.stack.map((x) => `<span class="chip">${esc(x)}</span>`).join("")}</div>
             <div class="ch-actions"><a class="btn acc" href="#${p.id}">Case study <span class="arr">→</span></a><a class="btn ghost" href="${p.repo}" target="_blank" rel="noopener">Code <span class="arr">↗</span></a></div>
+            <a class="act" data-activity="${p.id}" target="_blank" rel="noopener" hidden></a>
           </div>
           <div class="rv">
             ${frameHTML(p, true)}
@@ -84,6 +89,7 @@
         <h1 class="cs-name">${esc(p.name)}<span class="sq"></span></h1>
         <div class="cs-lede"><p>${esc(c.lede)}</p><dl class="facts">${c.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl></div>
         <div class="ch-actions"><a class="btn acc" href="${p.repo}" target="_blank" rel="noopener">View the code <span class="arr">↗</span></a><button class="btn ghost" type="button" data-jump="cs-screens">See the screens <span class="arr">↓</span></button></div>
+        <a class="act" data-activity="${p.id}" target="_blank" rel="noopener" hidden></a>
       </div></section>
 
       <section class="cs-sec"><div class="wrap">
@@ -94,7 +100,7 @@
       <section class="cs-sec" id="cs-screens"><div class="wrap">
         <div class="cs-sec-head"><span class="label"><b>02</b> — What you see</span><h2>The screens</h2></div>
         ${p.screens.map((s, k) => `<div class="shot">
-          <div class="frame"><div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><div class="frame-url"><b>${esc(s.url)}</b></div>${flagHTML(s)}</div><div class="frame-view"><img src="${s.src}" alt="${esc(p.name + ": " + s.title)}" loading="lazy" decoding="async" width="1440" height="900"></div></div>
+          <div class="frame"><div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><div class="frame-url"><b>${esc(s.url)}</b></div>${flagHTML(s)}</div><div class="frame-view${s.kind === "tape" ? " tall" : ""}">${viewHTML(p, s, true, true)}</div></div>
           <div><span class="label"><b>${pad(k + 1)}</b> — Screen</span><h3>${esc(s.title)}</h3><p>${esc(s.cap)}</p><span class="note">${esc(s.note)}</span></div>
         </div>`).join("")}
       </div></section>
@@ -116,6 +122,8 @@
 
       <a class="next wrap" href="#${nx.id}" style="--acc: var(--${nx.id})"><span class="label">Next project · ${esc(nx.layer)}</span><span class="nm">${esc(nx.name)}<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`;
     wireReveal(caseEl);
+    window.SignalTape.mount(caseEl);
+    paintActivity(caseEl);
   }
 
   /* ------------------------------------------------------------ router */
@@ -153,8 +161,11 @@
     if (tab) {
       const frame = tab.closest(".frame"), p = D.projects.find((x) => x.id === frame.dataset.screens), i = +tab.dataset.i, s = p.screens[i];
       $$("[role=tab]", frame).forEach((b) => b.setAttribute("aria-selected", String(b === tab)));
-      $$(".frame-view img", frame).forEach((im, k) => im.classList.toggle("on", k === i));
-      $("[data-url]", frame).innerHTML = `<b>${esc(s.url)}</b>`;
+      $$(".frame-view > .fv", frame).forEach((v, k) => v.classList.toggle("on", k === i));
+      $(".frame-view", frame).classList.toggle("tall", s.kind === "tape");
+      const tapeEl = s.kind === "tape" && $(".frame-view > .fv.on", frame);
+      $("[data-url]", frame).innerHTML = `<b>${esc((tapeEl && tapeEl.dataset.url) || s.url)}</b>`;
+      if (tapeEl) window.SignalTape.refresh();
       $("[data-flag]", frame).innerHTML = flagHTML(s);
       const cap = frame.parentElement.querySelector("[data-cap]");
       if (cap) cap.innerHTML = `<span>${esc(s.cap)}</span><span class="note">${esc(s.note)}</span>`;
@@ -211,12 +222,37 @@
   }
   tickClock(); setInterval(tickClock, 1000);
 
+  /* ------------------------------------------------------------ latest commit per project */
+  // assets/data/activity.json is written by the deploy workflow every 6 hours
+  // (.github/scripts/activity.mjs). If it is missing, the slots stay hidden.
+  let activity = null;
+  function actHTML(a) {
+    const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const d = new Date(a.date), days = Math.round((day(new Date()) - day(d)) / 864e5), fresh = days <= 14;
+    const when = !fresh ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+    return `<span class="act-k"><i class="${fresh ? "live" : ""}"></i>Last commit · ${when}</span><span class="act-m">${esc(a.message)}</span><span class="act-s">${esc(a.repo)} · ${esc(a.sha)}${a.last30 ? ` · ${a.last30} commits in the last 30 days` : ""} ↗</span>`;
+  }
+  function paintActivity(root) {
+    if (!activity) return;
+    $$("[data-activity]", root).forEach((el) => {
+      const a = activity.projects[el.dataset.activity];
+      if (!a) return;
+      el.href = a.url; el.innerHTML = actHTML(a); el.hidden = false;
+    });
+  }
+  fetch("assets/data/activity.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { if (d && d.projects) { activity = d; paintActivity(document); } })
+    .catch(() => {});
+
   /* ------------------------------------------------------------ email (assembled, not in the HTML) */
   const EMAIL = ["adhiraj1904", "gmail.com"].join("@");
   $$("[data-mailto]").forEach((a) => { a.href = "mailto:" + EMAIL; a.textContent = EMAIL; });
 
   /* ------------------------------------------------------------ boot */
   window.Scenes.mount(document);
+  window.SignalTape.mount(document);
   wireReveal(document);
   route(true);
 })();
