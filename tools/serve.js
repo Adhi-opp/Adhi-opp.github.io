@@ -30,7 +30,11 @@ const client = `(() => {
 const listeners = new Set();
 
 http.createServer((req, res) => {
-  const url = decodeURIComponent(req.url.split('?')[0]);
+  // Answer only requests addressed to this machine by name, so a web page that
+  // re-points its own domain at 127.0.0.1 (DNS rebinding) can't read files here.
+  if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) { res.writeHead(403); return res.end(); }
+  let url;
+  try { url = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
   if (url === '/__reload') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
     res.write(': ok\n\n');
@@ -43,7 +47,10 @@ http.createServer((req, res) => {
     return res.end(client);
   }
   let file = path.join(root, url);
-  if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
+  // stay inside the site folder (a bare prefix check would also let in a sibling
+  // like "Technical portfolio2"), and keep dot-folders such as .git private
+  const rel = path.relative(root, file);
+  if (path.isAbsolute(rel) || rel.split(path.sep).some((s) => s.startsWith('.'))) { res.writeHead(404); return res.end(); }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }

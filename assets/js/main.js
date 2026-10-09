@@ -130,7 +130,8 @@
   const homeEl = $('[data-view="home"]');
   let view = null;
   function route(initial) {
-    const h = decodeURIComponent(location.hash.slice(1));
+    let h = location.hash.slice(1);
+    try { h = decodeURIComponent(h); } catch (err) {} // a malformed link just lands on home
     if (IDS.includes(h)) {
       renderCase(h);
       homeEl.hidden = true; caseEl.hidden = false;
@@ -237,7 +238,7 @@
     if (!activity) return;
     $$("[data-activity]", root).forEach((el) => {
       const a = activity.projects[el.dataset.activity];
-      if (!a) return;
+      if (!a || !/^https:\/\/github\.com\//.test(a.url)) return; // these links only ever go to GitHub
       el.href = a.url; el.innerHTML = actHTML(a); el.hidden = false;
     });
   }

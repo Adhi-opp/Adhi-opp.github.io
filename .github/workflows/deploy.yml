@@ -28,6 +28,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false # nothing here pushes, so don't leave the token in .git/config
 
       - uses: actions/setup-node@v7
         with:
